@@ -6,15 +6,22 @@ DATA_TO_CONNECT = """
             password='12345'
             host='127.0.0.1'
             port='5432'
-            dbname='test1' 
+            dbname='test' 
 """
 TABLE_NAME = "PRICE_ALERT"
 
 CREATE_QUERY = f""" CREATE TABLE IF NOT EXISTS {TABLE_NAME}(
                         ID SERIAL PRIMARY KEY,
                         DATE DATE NOT NULL DEFAULT CURRENT_DATE,
+                        AD_ID VARCHAR (100),
                         PRICE INTEGER NOT NULL
     )"""
+
+
+urls = []
+with open('urls.txt', 'r') as file:
+    for url in file:
+        urls.append(url.rstrip())
 
 
 def execute(query):
@@ -40,26 +47,29 @@ def execute(query):
 
 
 def find_price():
-    URL = "https://www.otomoto.pl/oferta/opel-corsa-c-1-0-ben-klima-5-drzwi-2002-mozliwa-zamiana-zarejestr-ID6CyGmZ.html"
-    response = requests.get(URL)
+    while True:
+        for url in urls:
+            response = requests.get(url)
+            try:
+                if response.status_code == 200:
+                    soup = BeautifulSoup(response.text, 'html.parser')
+                    ad_id = int(soup.find(id="ad_id").text)
 
-    try:
-        if response.status_code == 200:
-            soup = BeautifulSoup(response.text, 'html.parser')
+                    price = soup.find(class_="offer-price__number")
+                    price = str(price.contents[0])
+                    price = price.split(" ")
+                    price = int(price[0] + price[1])
 
-            while True:
-                results = soup.find(class_="offer-price__number")
-                results = str(results.contents[0])
-                results = results.split(" ")
-                results = int(results[0] + results[1])
-                insert_query = f""" INSERT INTO {TABLE_NAME} VALUES (default, default, {results})"""
-                print(results)
-                execute(insert_query)
-                time.sleep(86400)  # time in second between downloading data (86400 = 24h)
-        else:
-            print('Connection to the website failed')
-    except:
-        print('Error')
+                    insert_query = f""" INSERT INTO {TABLE_NAME} VALUES (default, default, {ad_id}, {price})"""
+                    print(price)
+                    execute(insert_query)
+                    response.close()
+                else:
+                    print('Connection to the website failed')
+            except:
+                print('Error')
+
+        time.sleep(2)  # time in second between downloading data (86400 = 24h)
 
 
 execute(CREATE_QUERY)
