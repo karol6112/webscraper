@@ -1,0 +1,4 @@
+EMAIL = 'your_email@gmail.com'
+PASSWORD = 'your_password'
+#TO = EMAIL                         #if you want send alert to yourself delete first "#"
+#TO = ['email_adress']              #if you want send alert to few contact | FOR EXAMPLE | TO = ['test1@gmail.com', test2@wp.pl, test3@onet.pl]

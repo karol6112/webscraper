@@ -1,4 +1,5 @@
-import requests, time, psycopg2
+import requests, time, psycopg2, smtplib
+import email_pass
 from bs4 import BeautifulSoup
 
 DATA_TO_CONNECT = """
@@ -17,11 +18,29 @@ CREATE_QUERY = f""" CREATE TABLE IF NOT EXISTS {TABLE_NAME}(
                         PRICE INTEGER NOT NULL
     )"""
 
-
 urls = []
 with open('urls.txt', 'r') as file:
     for url in file:
         urls.append(url.rstrip())
+
+
+def send_email():
+    user = email_pass.EMAIL
+    password = email_pass.PASSWORD
+    to = email_pass.TO
+    subject = "PRICE ALERT"
+    text = "Price has been reduced to "
+
+    try:
+        server = smtplib.SMTP('smtp.gmail.com:587')
+        server.ehlo()
+        server.starttls()
+        server.login(user, password)
+        message = f"Subject: {subject} \n {text}"
+        server.sendmail(user, to, message)
+        server.quit()
+    except:
+        print("ERROR. CAN'T SEND ALERT")
 
 
 def execute(query):
@@ -64,10 +83,16 @@ def find_price():
                     print(price)
                     execute(insert_query)
                     response.close()
+                elif response.status_code == 404:
+                    urls.remove(url)
+                    print("The advertisement is out of date")
                 else:
                     print('Connection to the website failed')
             except:
                 print('Error')
+
+        if not urls:
+            break
 
         time.sleep(2)  # time in second between downloading data (86400 = 24h)
 
