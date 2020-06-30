@@ -1,4 +1,4 @@
 .idea/
 venv/
-email_pass.py
+config.py
 test.py
