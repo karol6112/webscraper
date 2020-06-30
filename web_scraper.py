@@ -1,13 +1,7 @@
-import requests, time, psycopg2
+import requests, time, psycopg2, smtplib
+import config
 from bs4 import BeautifulSoup
 
-DATA_TO_CONNECT = """
-            user='postgres'
-            password='12345'
-            host='127.0.0.1'
-            port='5432'
-            dbname='test' 
-"""
 TABLE_NAME = "PRICE_ALERT"
 
 CREATE_QUERY = f""" CREATE TABLE IF NOT EXISTS {TABLE_NAME}(
@@ -17,16 +11,36 @@ CREATE_QUERY = f""" CREATE TABLE IF NOT EXISTS {TABLE_NAME}(
                         PRICE INTEGER NOT NULL
     )"""
 
-
-urls = []
+urls = {}
 with open('urls.txt', 'r') as file:
-    for url in file:
-        urls.append(url.rstrip())
+    for data in file:
+        data = data.rstrip().split("|")
+        urls[data[0]] = int(data[1])
+
+
+def send_email(url, price):
+    user = config.EMAIL
+    password = config.PASSWORD
+    to = config.TO
+    subject = "PRICE ALERT"
+    text = f"{url}\nPrice has been reduced to: {price}"
+
+    try:
+        server = smtplib.SMTP('smtp.gmail.com:587')
+        server.ehlo()
+        server.starttls()
+        server.login(user, password)
+        message = f"Subject: {subject} \n\n {text}"
+        server.sendmail(user, to, message)
+        server.quit()
+        print("Alert has been sent")
+    except:
+        print("ERROR. CAN'T SEND ALERT")
 
 
 def execute(query):
     try:
-        connection = psycopg2.connect(DATA_TO_CONNECT)
+        connection = psycopg2.connect(config.DATA_TO_CONNECT)
     except (Exception, psycopg2.Error) as error:
         print("Connecting Error", error)
         connection = None
@@ -48,8 +62,9 @@ def execute(query):
 
 def find_price():
     while True:
-        for url in urls:
+        for url, price_alert in list(urls.items()):
             response = requests.get(url)
+
             try:
                 if response.status_code == 200:
                     soup = BeautifulSoup(response.text, 'html.parser')
@@ -63,13 +78,22 @@ def find_price():
                     insert_query = f""" INSERT INTO {TABLE_NAME} VALUES (default, default, {ad_id}, {price})"""
                     print(price)
                     execute(insert_query)
+                    if price <= price_alert:
+                        send_email(url, price)
+
                     response.close()
+                elif response.status_code == 404:
+                    urls.pop(url)
+                    print("The advertisement is out of date")
                 else:
                     print('Connection to the website failed')
             except:
                 print('Error')
 
-        time.sleep(2)  # time in second between downloading data (86400 = 24h)
+        if not urls:
+            break
+
+        time.sleep(86400)  # time in second between downloading data (86400 = 24h)
 
 
 execute(CREATE_QUERY)
