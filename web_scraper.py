@@ -2,6 +2,8 @@ import requests, time, psycopg2, smtplib
 import config
 from bs4 import BeautifulSoup
 
+
+
 TABLE_NAME = "PRICE_ALERT"
 
 CREATE_QUERY = f""" CREATE TABLE IF NOT EXISTS {TABLE_NAME}(
