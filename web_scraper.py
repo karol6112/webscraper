@@ -1,7 +1,10 @@
-import requests, time, psycopg2, smtplib
-import config
+import requests
+import time
+import psycopg2
+import smtplib
 from bs4 import BeautifulSoup
-
+# files
+import config
 
 
 TABLE_NAME = "PRICE_ALERT"
@@ -57,7 +60,7 @@ def execute(query):
 
     finally:
         connection.commit()
-        if connection != None:
+        if connection is not None:
             cursor.close()
             connection.close()
 
