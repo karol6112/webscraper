@@ -1,11 +1,6 @@
-import requests
-import time
-import psycopg2
-import smtplib
-from bs4 import BeautifulSoup
-# files
+import requests, time, psycopg2, smtplib
 import config
-
+from bs4 import BeautifulSoup
 
 TABLE_NAME = "PRICE_ALERT"
 
@@ -14,13 +9,16 @@ CREATE_QUERY = f""" CREATE TABLE IF NOT EXISTS {TABLE_NAME}(
                         DATE DATE NOT NULL DEFAULT CURRENT_DATE,
                         AD_ID VARCHAR (100),
                         PRICE INTEGER NOT NULL
-    )"""
+                )"""
 
-urls = {}
-with open('urls.txt', 'r') as file:
-    for data in file:
-        data = data.rstrip().split("|")
-        urls[data[0]] = int(data[1])
+
+def read_urls():
+    urls = {}
+    with open('urls.txt', 'r') as file:
+        for data in file:
+            data = data.rstrip().split("|")
+            urls[data[0]] = int(data[1])
+    return urls
 
 
 def send_email(url, price):
@@ -60,29 +58,45 @@ def execute(query):
 
     finally:
         connection.commit()
-        if connection is not None:
+        if connection != None:
             cursor.close()
             connection.close()
 
 
-def find_price():
+def find_id(response):
+    soup = BeautifulSoup(response.text, 'html.parser')
+    ad_id = int(soup.find(id="ad_id").text)
+    return ad_id
+
+
+def find_price(response):
+    soup = BeautifulSoup(response.text, 'html.parser')
+    price = soup.find(class_="offer-price__number")
+    price = str(price.contents[0])
+    price = price.split(" ")
+    price = int(price[0] + price[1])
+    return price
+
+
+if __name__ == "__main__":
+
+    execute(CREATE_QUERY)
+    urls = read_urls()
+
     while True:
         for url, price_alert in list(urls.items()):
             response = requests.get(url)
 
             try:
                 if response.status_code == 200:
-                    soup = BeautifulSoup(response.text, 'html.parser')
-                    ad_id = int(soup.find(id="ad_id").text)
-
-                    price = soup.find(class_="offer-price__number")
-                    price = str(price.contents[0])
-                    price = price.split(" ")
-                    price = int(price[0] + price[1])
+                    ad_id = find_id(response)
+                    price = find_price(response)
 
                     insert_query = f""" INSERT INTO {TABLE_NAME} VALUES (default, default, {ad_id}, {price})"""
                     print(price)
+
                     execute(insert_query)
+
                     if price <= price_alert:
                         send_email(url, price)
 
@@ -96,10 +110,7 @@ def find_price():
                 print('Error')
 
         if not urls:
+            print("Urls.txt has not active links. Add links to ad")
             break
 
-        time.sleep(86400)  # time in second between downloading data (86400 = 24h)
-
-
-execute(CREATE_QUERY)
-find_price()
+        time.sleep(1)  # time in second between downloading data (86400 = 24h)
